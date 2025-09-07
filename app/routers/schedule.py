@@ -14,7 +14,6 @@ from app.utils.security import decode_access_token, auth_error
 router = APIRouter()
 scheduler = AsyncIOScheduler()
 
-# Load settings from the config file
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 
@@ -115,11 +114,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
     print(f"Extracted token: {token}")
     authorized = await manager.connect(websocket, token)
     if not authorized:
-        return  # Connection closed due to invalid token
+        return  
 
     try:
         while True:
-            # Keep connection alive, you can also handle incoming messages if needed
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)

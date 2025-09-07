@@ -28,27 +28,22 @@ APP_DOMAIN = settings.DOMAIN_URL
 
 @router.get("/authorize")
 async def twitter_authorize(current_user: int = Depends(get_current_user)):
-    # Generate a temporary unique token for this user
     demo_token = secrets.token_urlsafe(32)
     demo_request_tokens[current_user] = demo_token
 
-    # Build full callback URL on your app domain
     callback_url = f"{APP_DOMAIN}/accounts/callback?token={demo_token}"
     return RedirectResponse(callback_url)
 
 
 @router.get("/callback")
 async def twitter_callback(token: str, current_user: int = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    # Check if account already exists for this user and platform
     result = await db.execute(
         select(Account).filter(Account.user_id == current_user, Account.platform == Platform.twitter)
     )
     existing_account = result.scalars().first()
     if existing_account:
-        # User already has a Twitter account linked
         return {"msg": "Twitter account already linked", "account_id": existing_account.id}
 
-    # Create a new linked Twitter account
     fake_username = f"demo_user_{current_user}"
     new_account = Account(
         platform=Platform.twitter,
@@ -118,7 +113,6 @@ async def delete_account_by_platform(
 # -----------------------------
 @router.get("/followers")
 async def twitter_followers(db: AsyncSession = Depends(get_db), current_user: int = Depends(get_current_user)):
-    # Return fake list of followers
     followers = [{"username": f"follower_{i}", "name": f"Follower {i}"} for i in range(1, 6)]
     return followers
 
@@ -150,8 +144,6 @@ async def create_tweet(content: TweetCreate, db: AsyncSession = Depends(get_db),
     account = result.scalars().first()
     if not account:
         raise HTTPException(status_code=404, detail="No linked account found")
-    
-    # Create a post in DB instead of posting to the platform
     new_post = Post(
         content=content.content,
         status="published",
@@ -178,7 +170,6 @@ async def schedule_post(
     db: AsyncSession = Depends(get_db),
     current_user: int = Depends(get_current_user)
 ):
-    # Fetch any linked account (first one) for the user
     result = await db.execute(
         select(Account).filter(Account.user_id == current_user)
     )
@@ -186,12 +177,10 @@ async def schedule_post(
     if not account:
         raise HTTPException(status_code=404, detail="No linked account found")
 
-    # Validate scheduled_time is in the future
     now = datetime.now(timezone.utc)
     if request.scheduled_time <= now:
         raise HTTPException(status_code=400, detail="scheduled_time must be in the future")
 
-    # Create the scheduled post
     new_post = Post(
         content=request.content,
         scheduled_time=request.scheduled_time,
@@ -218,7 +207,7 @@ async def add_platform_account(
     db: AsyncSession = Depends(get_db),
     current_user: int = Depends(get_current_user), 
 ):
-    # Check if account already exists for this user with same platform and username
+
     result = await db.execute(
         select(Account)
         .filter(Account.user_id == current_user)
@@ -232,7 +221,6 @@ async def add_platform_account(
             detail=f"Account with username '{data.username}' on platform '{data.platform.value}' already exists for this user."
         )
 
-    # Create new account
     new_account = Account(
         platform=data.platform,
         username=data.username,

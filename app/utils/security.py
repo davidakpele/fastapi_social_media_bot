@@ -34,7 +34,6 @@ def create_access_token(
     if role:
         to_encode["role"] = role
 
-    # default to 30 days if no expires_delta provided
     expire = datetime.utcnow() + (expires_delta or timedelta(days=30))
     to_encode["exp"] = expire
     to_encode["iat"] = datetime.utcnow()

@@ -27,8 +27,6 @@ class CustomOAuth2PasswordBearer(OAuth2PasswordBearer):
         except HTTPException:
             raise auth_error("No authentication token provided in request.")
 
-
-# use the custom OAuth2 scheme
 oauth2_scheme = CustomOAuth2PasswordBearer(tokenUrl="token")
 
 

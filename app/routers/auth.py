@@ -52,7 +52,6 @@ async def register_action(
     return JSONResponse({"msg": "User registered successfully"}, status_code=201)
 
 
-# ---------------- Login ----------------
 
 @router.get("/login")
 def login_page(request: Request):
@@ -92,8 +91,6 @@ async def login_action(
         "email": user.email
     })
 
-
-# ---------------- Logout ----------------
 
 @router.get("/logout")
 def logout_user(request: Request):
