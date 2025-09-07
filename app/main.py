@@ -8,7 +8,7 @@ import uvicorn
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
 # Mount the static directory for CSS and JS
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# app.mount("/static", StaticFiles(directory="static"), name="static")
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])

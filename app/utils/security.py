@@ -26,13 +26,15 @@ def create_access_token(
 ) -> str:
     """
     Create a JWT token with sub, name, role, iat, and exp.
+    Default expiration: 30 days if expires_delta not provided.
     """
     to_encode = data.copy()
 
     if role:
         to_encode["role"] = role
 
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    # default to 30 days if no expires_delta provided
+    expire = datetime.utcnow() + (expires_delta or timedelta(days=30))
     to_encode["exp"] = expire
     to_encode["iat"] = datetime.utcnow()
 
