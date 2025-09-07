@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from fastapi import HTTPException, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from typing import Optional, Dict, Any
@@ -48,3 +49,18 @@ def decode_access_token(token: str):
         return payload
     except JWTError:
         return None
+
+
+def auth_error(details: str):
+    """Helper to build a consistent auth error response."""
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={
+            "error": "Access Denied",
+            "status": "error",
+            "title": "Authentication Error",
+            "message": "Authorization Access",
+            "details": details,
+            "code": "generic_authentication_error",
+        },
+    )

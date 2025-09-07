@@ -1,0 +1,38 @@
+body { font-family: Arial, sans-serif;  background: #f0f0f0; }
+header h1 { margin-bottom: 20px; }
+section { margin-bottom: 30px; }
+textarea, input { display: block; width: 100%; margin-bottom: 10px; padding: 6px; }
+button { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+
+#schedule-msg { margin-top: 8px; color: green; }
+
+.nav-btn {
+    @apply w-full text-left px-4 py-3 rounded-xl hover:bg-gray-700 transition-colors duration-200;
+  }
+  .nav-btn-mobile {
+    @apply px-4 py-2 text-lg text-gray-400 hover:text-blue-400 transition-colors duration-200;
+  }
+  .active-link {
+    background-color: #2b6cb0; /* Blue highlight */
+    color: white;
+  }
+  .btn-logout {
+    @apply bg-red-500 hover:bg-red-600 text-center font-semibold py-3 px-4 rounded-xl shadow-lg transition-colors duration-200;
+  }
+  .btn-login {
+    @apply block bg-blue-600 hover:bg-blue-700 py-2 rounded-xl;
+  }
+  .btn-register {
+    @apply block bg-green-600 hover:bg-green-700 py-2 rounded-xl;
+  }
+
+    .nav-item-button:hover:not(.active-link) {
+        background-color: #3B4553;
+        color: #B5D2F8;
+    }
+    .active-link {
+        background-color: #4C586B;
+        color: white;
+        font-weight: bold;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }

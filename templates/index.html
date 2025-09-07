@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<body class="bg-gray-900 text-white min-h-screen flex relative overflow-x-hidden">
+
+    <button id="drawerToggle" class="sm:hidden fixed top-4 left-4 z-50 bg-blue-600 hover:bg-blue-700 transition-colors p-3 rounded-lg shadow-lg focus:outline-none">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+    </button>
+
+    <aside id="sidebarDrawer"
+        class="fixed top-0 left-0 h-screen w-64 bg-gray-800 p-6 space-y-6 transform -translate-x-full transition-transform duration-300 ease-in-out z-40 sm:translate-x-0 sm:relative sm:block sm:w-64 sm:rounded-r-3xl"
+        style="background: linear-gradient(180deg, #2D3748 0%, #1A202C 100%);">
+        <h2 class="text-3xl font-bold text-blue-400 text-center mb-10">Bot Control</h2>
+        <nav class="flex-1 space-y-3">
+            <button onclick="showSection('feed', this)"
+                class="w-full text-left px-4 py-3 rounded-xl transition-all duration-200 nav-item-button active-link">
+                <span class="mr-2">🏠</span> Feed
+            </button>
+            <button onclick="showSection('schedule', this)"
+                class="w-full text-left px-4 py-3 rounded-xl transition-all duration-200 nav-item-button">
+                <span class="mr-2">🕒</span> Schedule
+            </button>
+            <button onclick="showSection('accounts', this)"
+                class="w-full text-left px-4 py-3 rounded-xl transition-all duration-200 nav-item-button">
+                <span class="mr-2">👤</span> Accounts
+            </button>
+            <button onclick="showSection('followers', this)"
+                class="w-full text-left px-4 py-3 rounded-xl transition-all duration-200 nav-item-button">
+                <span class="mr-2">👥</span> Followers
+            </button>
+            <button onclick="showSection('following', this)"
+                class="w-full text-left px-4 py-3 rounded-xl transition-all duration-200 nav-item-button">
+                <span class="mr-2">➡️</span> Following
+            </button>
+        </nav>
+        {% if user %}
+            <a href="/auth/logout/" class="bg-red-500 hover:bg-red-600 text-white text-center font-semibold py-3 px-4 rounded-xl shadow-lg transition-colors duration-200 block">
+                Logout
+            </a>
+        {% else %}
+            <div class="text-center space-y-2">
+                <a href="/auth/login" class="block bg-blue-600 hover:bg-blue-700 py-2 rounded-xl">Login</a>
+                <a href="/auth/register" class="block bg-green-600 hover:bg-green-700 py-2 rounded-xl">Register</a>
+            </div>
+        {% endif %}
+    </aside>
+
+    <main class="flex-1 p-6 sm:p-12 overflow-y-auto">
+        <header class="flex justify-between items-center mb-10">
+            <h4 class="sm:text-4xl font-extrabold text-blue-300">Twitter Bot Dashboard</h4>
+            {% if user %}
+                <span class="text-gray-400">Hi, {{ user.username }} 👋</span>
+            {% endif %}
+        </header>
+
+        <section id="feed" class="section">
+            <h3 class="text-2xl font-semibold mb-6">Latest Posts</h3>
+            <div id="posts-list" class="space-y-4">
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
+                    <p class="text-gray-400">No recent posts to display.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="schedule" class="section hidden">
+            <h3 class="text-2xl font-semibold mb-6">Schedule a Tweet</h3>
+            <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
+                <textarea id="post-content" placeholder="What's happening?"
+                    class="w-full p-4 mb-4 rounded-xl bg-gray-700 text-gray-200 resize-none"></textarea>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <input type="datetime-local" id="scheduled-time"
+                        class="w-full sm:w-auto p-4 rounded-xl bg-gray-700 text-gray-200">
+                    <button onclick="schedulePost()"
+                        class="w-full sm:w-auto bg-blue-600 text-white font-bold py-4 px-6 rounded-xl hover:bg-blue-700 transition-transform transform hover:scale-105 active:scale-95">
+                        🚀 Schedule
+                    </button>
+                </div>
+                <div id="schedule-msg" class="mt-4 text-sm text-green-400 font-semibold hidden"></div>
+            </div>
+            
+            <h3 class="text-xl font-semibold mt-8 mb-4">Scheduled Posts</h3>
+            <div id="scheduled-posts-list" class="space-y-4">
+                </div>
+        </section>
+
+        <section id="accounts" class="section hidden">
+            <h3 class="text-2xl font-semibold mb-6">Linked Accounts</h3>
+            <ul id="accounts-list" class="space-y-3"></ul>
+            <div id="add-account-form" class="hidden mt-6 bg-gray-900 p-6 rounded-xl shadow-lg border border-gray-700">
+                <h3 class="text-lg font-semibold mb-4 text-white">Add New Account</h3>
+                <form id="accountForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Platform</label>
+                        <select name="platform" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600">
+                            <option value="twitter">Twitter</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="tiktok">Tiktok</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Username</label>
+                        <input type="text" name="username" placeholder="@username"
+                            class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600" required>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" onclick="cancelAccountForm()"
+                            class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-gray-200">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                            class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section id="followers" class="section hidden">
+            <h3 class="text-2xl font-semibold mb-6">Followers</h3>
+            <ul id="followers-list" class="space-y-3">
+                <li class="bg-gray-800 p-6 rounded-2xl border border-gray-700 text-gray-400">No followers found.</li>
+            </ul>
+        </section>
+
+        <section id="following" class="section hidden">
+            <h3 class="text-2xl font-semibold mb-6">Following</h3>
+            <ul id="following-list" class="space-y-3">
+                <li class="bg-gray-800 p-6 rounded-2xl border border-gray-700 text-gray-400">Not following anyone.</li>
+            </ul>
+        </section>
+    </main>
+</body>
+
+
+<script>
+    const sections = document.querySelectorAll('.section');
+    const navButtons = document.querySelectorAll('aside nav button');
+    const drawer = document.getElementById("sidebarDrawer");
+    const toggleBtn = document.getElementById("drawerToggle");
+
+    function showSection(id, element) {
+        sections.forEach(s => s.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+
+        navButtons.forEach(btn => btn.classList.remove('active-link'));
+        if (element) {
+            element.classList.add('active-link');
+        }
+
+        if (window.innerWidth < 640) {
+            drawer.classList.add("-translate-x-full");
+        }
+    }
+
+    toggleBtn.addEventListener("click", () => {
+        drawer.classList.toggle("-translate-x-full");
+    });
+</script>
+{% endblock %}

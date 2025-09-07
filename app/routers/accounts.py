@@ -1,5 +1,8 @@
+from datetime import datetime, timezone
 from app.models.account import Account, Platform
+from app.models.post import Post
 from app.payloads.account_create import AccountCreate
+from app.payloads.create_twitter import ScheduleTweetRequest, TweetCreate, TweetWithMedia
 from app.payloads.register_request import RegisterRequest
 from app.routers.dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -12,87 +15,205 @@ from typing import List
 import tweepy
 from app.config import settings
 from typing import Dict
-
-
-
-TWITTER_API_KEY = settings.TWITTER_API_KEY
-TWITTER_API_SECRET = settings.TWITTER_API_SECRET
-TWITTER_CALLBACK_URL = "https://fastapi-social-media-bot-1.onrender.com"
+import secrets
+from fastapi.responses import RedirectResponse
 
 router = APIRouter()
 
-# Temporary in-memory storage for request tokens (for local testing)
-request_tokens: Dict[int, dict] = {}
-
+# -----------------------------
+# Simulated Twitter Authorization
+# -----------------------------
+demo_request_tokens: dict[int, str] = {}
+APP_DOMAIN = settings.DOMAIN_URL
 
 @router.get("/authorize")
 async def twitter_authorize(current_user: int = Depends(get_current_user)):
-    """
-    Step 1: Redirect user to Twitter for authorization.
-    """
-    auth = tweepy.OAuth1UserHandler(
-        TWITTER_API_KEY,
-        TWITTER_API_SECRET,
-        TWITTER_CALLBACK_URL
-    )
-    redirect_url = auth.get_authorization_url()
+    # Generate a temporary unique token for this user
+    demo_token = secrets.token_urlsafe(32)
+    demo_request_tokens[current_user] = demo_token
 
-    # Save the request token in memory
-    request_tokens[current_user] = auth.request_token
-
-    # Return the URL so frontend can redirect user
-    return {"auth_url": redirect_url}
+    # Build full callback URL on your app domain
+    callback_url = f"{APP_DOMAIN}/accounts/callback?token={demo_token}"
+    return RedirectResponse(callback_url)
 
 
 @router.get("/callback")
-async def twitter_callback(
-    oauth_token: str,
-    oauth_verifier: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: int = Depends(get_current_user),
-):
-    """
-    Step 2: Handle callback from Twitter and save account.
-    """
-    # Check if the request token exists
-    if current_user not in request_tokens:
-        raise HTTPException(status_code=400, detail="Request token missing or expired")
-
-    auth = tweepy.OAuth1UserHandler(
-        TWITTER_API_KEY,
-        TWITTER_API_SECRET,
-        TWITTER_CALLBACK_URL
+async def twitter_callback(token: str, current_user: int = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    # Check if account already exists for this user and platform
+    result = await db.execute(
+        select(Account).filter(Account.user_id == current_user, Account.platform == Platform.twitter)
     )
-    # Retrieve and remove the original request token
-    auth.request_token = request_tokens.pop(current_user)
+    existing_account = result.scalars().first()
+    if existing_account:
+        # User already has a Twitter account linked
+        return {"msg": "Twitter account already linked", "account_id": existing_account.id}
 
-    # Exchange oauth_verifier for access token
-    try:
-        access_token, access_token_secret = auth.get_access_token(oauth_verifier)
-    except tweepy.TweepyException as e:
-        raise HTTPException(status_code=400, detail=f"Twitter OAuth error: {str(e)}")
-
-    # Fetch Twitter account info
-    api = tweepy.API(auth)
-    twitter_user = api.verify_credentials()
-    username = twitter_user.screen_name
-
-    # Save to database
+    # Create a new linked Twitter account
+    fake_username = f"demo_user_{current_user}"
     new_account = Account(
         platform=Platform.twitter,
-        username=username,
-        access_token=access_token,
-        access_token_secret=access_token_secret,
+        username=fake_username,
+        access_token=secrets.token_urlsafe(32),
+        refresh_token=secrets.token_urlsafe(32),
         user_id=current_user
     )
     db.add(new_account)
     await db.commit()
     await db.refresh(new_account)
 
+    # Remove token after use
+    demo_request_tokens.pop(current_user, None)
+
     return {"msg": "Twitter account linked successfully", "account_id": new_account.id}
 
-@router.post("/", response_model=dict)
-async def create_account(
+# -----------------------------
+# Fetch User Info
+# -----------------------------
+@router.get("/me")
+async def twitter_me(db: AsyncSession = Depends(get_db), current_user: int = Depends(get_current_user)):
+    result = await db.execute(select(Account).filter(Account.user_id == current_user))
+    accounts = result.scalars().all()
+
+    if not accounts:
+        raise HTTPException(status_code=200, detail="No accounts linked")
+
+    return [
+        {
+            "username": acc.username,
+            "platform": acc.platform.value if hasattr(acc.platform, "value") else acc.platform,
+            "name": "Demo User",
+            "followers_count": 100,
+            "following_count": 50
+        }
+        for acc in accounts
+    ]
+
+
+@router.delete("/{platform}/{username}")
+async def delete_account_by_platform(
+    platform: str,
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: int = Depends(get_current_user) 
+):
+    result = await db.execute(
+        select(Account).filter(
+            Account.user_id == current_user, 
+            Account.platform == platform.lower(),
+            Account.username == username
+        )
+    )
+    account = result.scalars().first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    await db.delete(account)
+    await db.commit()
+    
+    return {"msg": f"Account '{username}' on {platform} disconnected successfully"}
+
+# -----------------------------
+# Fetch Followers / Following
+# -----------------------------
+@router.get("/followers")
+async def twitter_followers(db: AsyncSession = Depends(get_db), current_user: int = Depends(get_current_user)):
+    # Return fake list of followers
+    followers = [{"username": f"follower_{i}", "name": f"Follower {i}"} for i in range(1, 6)]
+    return followers
+
+@router.get("/following")
+async def twitter_following(db: AsyncSession = Depends(get_db), current_user: int = Depends(get_current_user)):
+    following = [{"username": f"following_{i}", "name": f"Following {i}"} for i in range(1, 6)]
+    return following
+
+# -----------------------------
+# User Timeline / Posts
+# -----------------------------
+@router.get("/tweets")
+async def get_user_tweets(count: int = 5, db: AsyncSession = Depends(get_db), current_user: int = Depends(get_current_user)):
+    result = await db.execute(select(Post).filter(Post.user_id == current_user).order_by(Post.created_at.desc()))
+    posts = result.scalars().all()
+    return [
+        {"id": p.id, "text": p.content, "created_at": p.created_at, "status": p.status}
+        for p in posts[:count]
+    ]
+
+# -----------------------------
+# Post Tweet (Offline / DB)
+# -----------------------------
+@router.post("/tweets")
+async def create_tweet(content: TweetCreate, db: AsyncSession = Depends(get_db), current_user: int = Depends(get_current_user)):
+    result = await db.execute(
+        select(Account).filter(Account.user_id == current_user)
+    )
+    account = result.scalars().first()
+    if not account:
+        raise HTTPException(status_code=404, detail="No linked account found")
+    
+    # Create a post in DB instead of posting to the platform
+    new_post = Post(
+        content=content.content,
+        status="published",
+        published_time=datetime.utcnow(),
+        user_id=current_user,
+        account_id=account.id
+    )
+    db.add(new_post)
+    await db.commit()
+    await db.refresh(new_post)
+
+    return {
+        "msg": f"Post published successfully on {account.platform.value.capitalize()} (offline demo)",
+        "post_id": new_post.id
+    }
+
+
+# -----------------------------
+# Schedule Tweet
+# -----------------------------
+@router.post("/schedule")
+async def schedule_post(
+    request: ScheduleTweetRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: int = Depends(get_current_user)
+):
+    # Fetch any linked account (first one) for the user
+    result = await db.execute(
+        select(Account).filter(Account.user_id == current_user)
+    )
+    account = result.scalars().first()
+    if not account:
+        raise HTTPException(status_code=404, detail="No linked account found")
+
+    # Validate scheduled_time is in the future
+    now = datetime.now(timezone.utc)
+    if request.scheduled_time <= now:
+        raise HTTPException(status_code=400, detail="scheduled_time must be in the future")
+
+    # Create the scheduled post
+    new_post = Post(
+        content=request.content,
+        scheduled_time=request.scheduled_time,
+        status="scheduled",
+        user_id=current_user,
+        account_id=account.id
+    )
+    db.add(new_post)
+    await db.commit()
+    await db.refresh(new_post)
+
+    print(f"[INFO] {now.isoformat()} - Scheduled post id={new_post.id} for user_id={current_user} on {account.platform.value} at {request.scheduled_time.isoformat()}")
+
+    return {
+        "msg": f"Post scheduled successfully on {account.platform.value.capitalize()} (offline demo)",
+        "post_id": new_post.id,
+        "scheduled_time": new_post.scheduled_time
+    }
+
+
+@router.post("/add-platform", response_model=dict)
+async def add_platform_account(
     data: AccountCreate,
     db: AsyncSession = Depends(get_db),
     current_user: int = Depends(get_current_user), 
@@ -121,40 +242,3 @@ async def create_account(
     await db.commit()
     await db.refresh(new_account)
     return {"msg": "Account linked successfully", "account_id": new_account.id}
-
-
-@router.get("/", response_model=List[dict])
-async def get_accounts(
-    db: AsyncSession = Depends(get_db),
-    current_user: int = Depends(get_current_user),  # user_id
-):
-    result = await db.execute(
-        select(Account).filter(Account.user_id == current_user)
-    )
-    accounts = result.scalars().all()
-    
-    return [
-        {
-            "id": acc.id,
-            "platform": acc.platform,
-            "username": acc.username,
-            "created_at": acc.created_at
-        }
-        for acc in accounts
-    ]
-
-
-@router.delete("/{account_id}")
-async def delete_account(account_id: int, 
-                         db: AsyncSession = Depends(get_db), 
-                         current_user=Depends(get_current_user)):
-    result = await db.execute(
-        select(Account).filter(Account.id == account_id, Account.user_id == current_user.id)
-    )
-    account = result.scalars().first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-    
-    await db.delete(account)
-    await db.commit()
-    return {"msg": "Account disconnected successfully"}

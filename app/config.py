@@ -1,5 +1,7 @@
-# app/config.py
+from pathlib import Path
 from pydantic_settings import BaseSettings
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     # Project
@@ -20,7 +22,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
+    
     # API keys for Instagram, Twitter (X), TikTok
     INSTAGRAM_CLIENT_ID: str | None = None
     INSTAGRAM_CLIENT_SECRET: str | None = None
@@ -28,7 +30,9 @@ class Settings(BaseSettings):
     TWITTER_API_SECRET: str | None = None
     TIKTOK_CLIENT_KEY: str | None = None
     TIKTOK_CLIENT_SECRET: str | None = None
-
+    TWITTER_CALLBACK_URL: str | None = None
+    DOMAIN_URL : str | None = None
+    
     class Config:
         env_file = ".env"   
 
